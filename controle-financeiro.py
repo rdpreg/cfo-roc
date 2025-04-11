@@ -34,7 +34,7 @@ uploaded_file = st.file_uploader("📂 Faça o upload do extrato (.csv)", type=[
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
 
-    # Renomear colunas para facilitar o tratamento
+    # Renomear colunas
     colunas_map = {
         "Data": "Data",
         "data": "Data",
@@ -45,28 +45,38 @@ if uploaded_file is not None:
     }
     df = df.rename(columns={col: colunas_map[col] for col in df.columns if col in colunas_map})
 
-    # Verificar se as colunas esperadas estão presentes
     colunas_esperadas = ["Data", "Descrição", "Valor"]
     if not all(col in df.columns for col in colunas_esperadas):
         st.error("❌ O CSV precisa conter as colunas: Data, Descrição, Valor")
         st.stop()
 
-    # Filtrar apenas receitas (valores positivos)
+    # Processamento
     df_receitas = df[df["Valor"] > 0].copy()
-
-    # Corrigir data e gerar campos auxiliares
     df_receitas["Data"] = pd.to_datetime(df_receitas["Data"], dayfirst=True)
     df_receitas["Ano-Mês"] = df_receitas["Data"].dt.to_period("M").astype(str)
     df_receitas["Aluno"] = df_receitas["Descrição"].apply(extrair_nome)
     df_receitas["Plano"] = df_receitas["Valor"].apply(classificar_plano)
 
-    # Agrupar valores por mês, aluno e plano
+    # Agrupamento por mês, aluno e plano
     df_agrupado = df_receitas.groupby(["Ano-Mês", "Aluno", "Plano"])["Valor"].sum().reset_index()
 
-    # Exibir a tabela
+    # Interface de seleção de mês
+    meses_disponiveis = sorted(df_receitas["Ano-Mês"].unique(), reverse=True)
+    mes_selecionado = st.selectbox("📅 Selecione o mês para o relatório", meses_disponiveis)
+
+    df_mes = df_receitas[df_receitas["Ano-Mês"] == mes_selecionado]
+
+    total_recebido = df_mes["Valor"].sum()
+    total_por_plano = df_mes.groupby("Plano")["Valor"].sum().reset_index()
+
+    st.markdown(f"## 🧾 Relatório do mês: {mes_selecionado}")
+    st.metric("💰 Total Recebido", f"R$ {total_recebido:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+
+    st.subheader("📌 Total por tipo de plano")
+    st.dataframe(total_por_plano, use_container_width=True)
+
     st.subheader("📋 Pagamentos por Aluno, Mês e Plano")
     st.dataframe(df_agrupado, use_container_width=True)
 
-    # Baixar CSV
     csv = df_agrupado.to_csv(index=False).encode("utf-8")
     st.download_button("📥 Baixar CSV dos pagamentos", csv, "pagamentos_agrupados.csv", "text/csv")
