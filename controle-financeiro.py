@@ -4,7 +4,6 @@ import pandas as pd
 st.set_page_config(page_title="Controle Financeiro", layout="wide")
 st.title("📊 Controle Financeiro - WebApp com CSV")
 
-# Função para extrair nome do aluno da descrição
 def extrair_nome(descricao):
     try:
         partes = descricao.split(" - ")
@@ -15,7 +14,6 @@ def extrair_nome(descricao):
         pass
     return "Não identificado"
 
-# Função para classificar o tipo de plano
 def classificar_plano(valor):
     if valor == 250:
         return "Mensal"
@@ -28,13 +26,11 @@ def classificar_plano(valor):
     else:
         return "Outros"
 
-# Upload do arquivo CSV
 uploaded_file = st.file_uploader("📂 Faça o upload do extrato (.csv)", type=["csv"])
 
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
 
-    # Renomear colunas para padronizar
     colunas_map = {
         "Data": "Data",
         "data": "Data",
@@ -45,28 +41,23 @@ if uploaded_file is not None:
     }
     df = df.rename(columns={col: colunas_map[col] for col in df.columns if col in colunas_map})
 
-    # Verificação de colunas obrigatórias
     colunas_esperadas = ["Data", "Descrição", "Valor"]
     if not all(col in df.columns for col in colunas_esperadas):
         st.error("❌ O CSV precisa conter as colunas: Data, Descrição, Valor")
         st.stop()
 
-    # Tratamento dos dados
     df_receitas = df[df["Valor"] > 0].copy()
     df_receitas["Data"] = pd.to_datetime(df_receitas["Data"], dayfirst=True)
     df_receitas["Ano-Mês"] = df_receitas["Data"].dt.to_period("M").astype(str)
     df_receitas["Aluno"] = df_receitas["Descrição"].apply(extrair_nome)
     df_receitas["Plano"] = df_receitas["Valor"].apply(classificar_plano)
 
-    # Selecionar mês
     meses_disponiveis = sorted(df_receitas["Ano-Mês"].unique(), reverse=True)
     mes_selecionado = st.selectbox("📅 Selecione o mês para o relatório", meses_disponiveis)
 
-    # Pagamentos do mês selecionado
     df_mes = df_receitas[df_receitas["Ano-Mês"] == mes_selecionado].copy()
-    df_mes["Validar"] = True  # Todos marcados por padrão
+    df_mes["Validar"] = True
 
-    # Interface de validação manual
     st.subheader("✅ Valide os pagamentos do mês")
     df_editado = st.data_editor(
         df_mes[["Data", "Aluno", "Valor", "Plano", "Descrição", "Validar"]],
@@ -75,28 +66,24 @@ if uploaded_file is not None:
         key="validacao_pagamentos"
     )
 
-    # Filtrar somente os validados
-    df_validados = df_editado[df_editado["Validar"] == True].copy()
+    if st.button("📊 Processar Relatório"):
+        df_validados = df_editado[df_editado["Validar"] == True].copy()
 
-    # Relatório do mês (somente validados)
-    total_recebido = df_validados["Valor"].sum()
+        total_recebido = df_validados["Valor"].sum()
+        total_por_plano = df_validados.groupby("Plano").agg({
+            "Valor": "sum",
+            "Aluno": "count"
+        }).reset_index().rename(columns={"Aluno": "Qtd Pagamentos"})
 
-    total_por_plano = df_validados.groupby("Plano").agg({
-        "Valor": "sum",
-        "Aluno": "count"
-    }).reset_index().rename(columns={"Aluno": "Qtd Pagamentos"})
+        st.markdown(f"## 🧾 Relatório do mês: {mes_selecionado}")
+        st.metric("💰 Total Recebido (validados)", f"R$ {total_recebido:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
-    st.markdown(f"## 🧾 Relatório do mês: {mes_selecionado}")
-    st.metric("💰 Total Recebido (validados)", f"R$ {total_recebido:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        st.subheader("📌 Total por tipo de plano")
+        st.dataframe(total_por_plano, use_container_width=True)
 
-    st.subheader("📌 Total por tipo de plano")
-    st.dataframe(total_por_plano, use_container_width=True)
+        st.subheader("📋 Pagamentos por Aluno, Mês e Plano (todos)")
+        df_agrupado = df_receitas.groupby(["Ano-Mês", "Aluno", "Plano"])["Valor"].sum().reset_index()
+        st.dataframe(df_agrupado, use_container_width=True)
 
-    # Visualização completa (todos os meses e alunos)
-    st.subheader("📋 Pagamentos por Aluno, Mês e Plano (todos)")
-    df_agrupado = df_receitas.groupby(["Ano-Mês", "Aluno", "Plano"])["Valor"].sum().reset_index()
-    st.dataframe(df_agrupado, use_container_width=True)
-
-    # Exportar CSV
-    csv = df_agrupado.to_csv(index=False).encode("utf-8")
-    st.download_button("📥 Baixar CSV dos pagamentos", csv, "pagamentos_agrupados.csv", "text/csv")
+        csv = df_agrupado.to_csv(index=False).encode("utf-8")
+        st.download_button("📥 Baixar CSV dos pagamentos", csv, "pagamentos_agrupados.csv", "text/csv")
