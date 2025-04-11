@@ -8,22 +8,23 @@ st.title("📊 Controle Financeiro - WebApp com CSV")
 uploaded_file = st.file_uploader("📂 Faça o upload do extrato (.csv)", type=["csv"])
 
 if uploaded_file is not None:
-    # Leitura do CSV
     df = pd.read_csv(uploaded_file)
 
-    # Garantir que os nomes das colunas sejam padronizados
-    df.columns = df.columns.str.strip().str.lower()
+    # Renomear colunas para facilitar o tratamento
+    colunas_map = {
+        "Data": "Data",
+        "data": "Data",
+        "Valor": "Valor",
+        "valor": "Valor",
+        "Descrição": "Descrição",
+        "descricao": "Descrição"
+    }
+    df = df.rename(columns={col: colunas_map[col] for col in df.columns if col in colunas_map})
 
-    # Verificação e renomeação das colunas se necessário
-    colunas_esperadas = ["data", "descricao", "valor"]
-    if all(col in df.columns for col in colunas_esperadas):
-        df = df.rename(columns={
-            "data": "Data",
-            "descricao": "Descrição",
-            "valor": "Valor"
-        })
-    else:
-        st.error("❌ O CSV precisa conter as colunas: data, descricao, valor")
+    # Verificar se as colunas esperadas estão presentes
+    colunas_esperadas = ["Data", "Descrição", "Valor"]
+    if not all(col in df.columns for col in colunas_esperadas):
+        st.error("❌ O CSV precisa conter as colunas: Data, Descrição, Valor")
         st.stop()
 
     # Filtrar apenas receitas (valores positivos)
