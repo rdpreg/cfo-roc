@@ -1,26 +1,30 @@
-
 import streamlit as st
 import pandas as pd
-from ofxparse import OfxParser
-from io import StringIO
 
 st.set_page_config(page_title="Controle Financeiro", layout="wide")
-st.title("📊 Controle Financeiro - WebApp Simples")
+st.title("📊 Controle Financeiro - WebApp com CSV")
 
-# Upload do arquivo OFX
-uploaded_file = st.file_uploader("📂 Faça o upload do extrato (.ofx)", type=["ofx"])
+# Upload do arquivo CSV
+uploaded_file = st.file_uploader("📂 Faça o upload do extrato (.csv)", type=["csv"])
 
 if uploaded_file is not None:
-    ofx = OfxParser.parse(uploaded_file)
-    transactions = ofx.account.statement.transactions
+    # Leitura do CSV
+    df = pd.read_csv(uploaded_file)
 
-    # Transformar em DataFrame
-    data = {
-        "Data": [t.date for t in transactions],
-        "Descrição": [t.payee for t in transactions],
-        "Valor": [t.amount for t in transactions]
-    }
-    df = pd.DataFrame(data)
+    # Garantir que os nomes das colunas sejam padronizados
+    df.columns = df.columns.str.strip().str.lower()
+
+    # Verificação e renomeação das colunas se necessário
+    colunas_esperadas = ["data", "descricao", "valor"]
+    if all(col in df.columns for col in colunas_esperadas):
+        df = df.rename(columns={
+            "data": "Data",
+            "descricao": "Descrição",
+            "valor": "Valor"
+        })
+    else:
+        st.error("❌ O CSV precisa conter as colunas: data, descricao, valor")
+        st.stop()
 
     # Filtrar apenas receitas (valores positivos)
     df_receitas = df[df["Valor"] > 0].copy()
