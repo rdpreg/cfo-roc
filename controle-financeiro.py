@@ -30,8 +30,8 @@ if uploaded_file is not None:
     # Filtrar apenas receitas (valores positivos)
     df_receitas = df[df["Valor"] > 0].copy()
 
-    # Converter datas e extrair mês/ano
-    df_receitas["Data"] = pd.to_datetime(df_receitas["Data"])
+    # Corrigir formatação da data (formato brasileiro: dia/mês/ano)
+    df_receitas["Data"] = pd.to_datetime(df_receitas["Data"], dayfirst=True)
     df_receitas["Ano-Mês"] = df_receitas["Data"].dt.to_period("M").astype(str)
 
     # Soma por mês
