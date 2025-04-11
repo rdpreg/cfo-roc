@@ -67,7 +67,11 @@ if uploaded_file is not None:
     df_mes = df_receitas[df_receitas["Ano-Mês"] == mes_selecionado]
 
     total_recebido = df_mes["Valor"].sum()
-    total_por_plano = df_mes.groupby("Plano")["Valor"].sum().reset_index()
+    total_por_plano = df_mes.groupby("Plano").agg({
+    "Valor": "sum",
+    "Aluno": "count"  # contando registros por plano
+    }).reset_index().rename(columns={"Aluno": "Qtd Pagamentos"})
+
 
     st.markdown(f"## 🧾 Relatório do mês: {mes_selecionado}")
     st.metric("💰 Total Recebido", f"R$ {total_recebido:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
